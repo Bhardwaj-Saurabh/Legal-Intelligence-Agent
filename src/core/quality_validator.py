@@ -99,18 +99,15 @@ class QualityValidator:
 
     def calculate_coherence_score(self, content: str, section_type: str) -> float:
         """
-        TODO 4: Calculate coherence score for the content.
+        Calculate coherence score for the content.
 
-        CURRENT STATE: Always returns 0.0 - no coherence checking!
-
-        Requirements:
-        Implement an algorithm that scores coherence from 0.0 to 1.0 based on:
+        Scores coherence from 0.0 to 1.0 based on:
         1. Paragraph structure (check for multiple paragraphs)
         2. Logical connectors (therefore, however, furthermore, etc.)
         3. Structured thinking (first, second, finally, etc.)
         4. Content depth (adequate number of sentences)
 
-        Scoring distribution (suggested):
+        Scoring distribution:
         - Multiple paragraphs: +0.3 points
         - Logical connectors present: +0.2 points
         - Structured presentation: +0.2 points
@@ -122,28 +119,72 @@ class QualityValidator:
 
         Returns:
             Float between 0.0 and 1.0 representing coherence
-
-        Hints:
-        - Split content by '\n\n' to find paragraphs
-        - Count logical connector words in the text
-        - Look for structure indicators (numbered lists, first/second/third)
-        - Count sentences by splitting on '.'
-        - Cap the final score at 1.0
         """
         score = 0.0
+        content_lower = content.lower()
 
-        # TODO 4: Implement coherence scoring algorithm
-        # YOUR CODE HERE (approximately 30-40 lines)
-        # Steps:
         # 1. Check paragraph structure (split by '\n\n')
-        # 2. Count logical connectors
-        # 3. Check for structured thinking markers
-        # 4. Measure content depth (sentence count)
-        # 5. Calculate final score (cap at 1.0)
+        paragraphs = [p.strip() for p in content.split('\n\n') if len(p.strip()) > 0]
+        if len(paragraphs) >= 3:
+            score += 0.3
+        elif len(paragraphs) >= 2:
+            score += 0.2
+        elif len(paragraphs) >= 1:
+            score += 0.1
 
-        # BROKEN IMPLEMENTATION - FIX THIS!
-        logger.warning("TODO 4 not implemented: Coherence scoring broken")
-        return 0.0  # Always returns 0 - FIX THIS!
+        # 2. Count logical connectors
+        logical_connectors = [
+            'therefore', 'however', 'furthermore', 'moreover', 'consequently',
+            'additionally', 'thus', 'hence', 'accordingly', 'nevertheless',
+            'nonetheless', 'meanwhile', 'subsequently', 'alternatively',
+            'specifically', 'particularly', 'notably', 'indeed', 'in fact',
+            'for example', 'for instance', 'in addition', 'on the other hand',
+            'as a result', 'in conclusion', 'in summary', 'overall'
+        ]
+        
+        connector_count = sum(1 for connector in logical_connectors if connector in content_lower)
+        if connector_count >= 5:
+            score += 0.2
+        elif connector_count >= 3:
+            score += 0.15
+        elif connector_count >= 1:
+            score += 0.1
+
+        # 3. Check for structured thinking markers
+        structure_markers = [
+            'first', 'second', 'third', 'fourth', 'fifth',
+            'initially', 'subsequently', 'finally', 'lastly',
+            'next', 'then', 'afterward', 'previously',
+            'step 1', 'step 2', 'step 3',
+            '1.', '2.', '3.', '4.', '5.',
+            'one', 'two', 'three', 'four', 'five'
+        ]
+        
+        structure_count = sum(1 for marker in structure_markers if marker in content_lower)
+        if structure_count >= 3:
+            score += 0.2
+        elif structure_count >= 2:
+            score += 0.15
+        elif structure_count >= 1:
+            score += 0.1
+
+        # 4. Measure content depth (sentence count)
+        # Split by sentence-ending punctuation, filter out empty strings
+        sentences = [s.strip() for s in content.replace('!', '.').replace('?', '.').split('.') 
+                    if len(s.strip()) > 10]  # Filter out very short fragments
+        
+        sentence_count = len(sentences)
+        if sentence_count >= 12:
+            score += 0.3
+        elif sentence_count >= 8:
+            score += 0.25
+        elif sentence_count >= 5:
+            score += 0.15
+        elif sentence_count >= 3:
+            score += 0.1
+
+        # Cap the final score at 1.0
+        return min(score, 1.0)
 
     def calculate_groundedness_score(
         self,
@@ -152,8 +193,6 @@ class QualityValidator:
         expected_elements: List[str]
     ) -> float:
         """
-        TODO 5: Calculate groundedness score for the content.
-
         CURRENT STATE: Always returns 0.0 - no groundedness checking!
 
         Requirements:
