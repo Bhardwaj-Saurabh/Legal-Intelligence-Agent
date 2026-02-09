@@ -36,29 +36,44 @@ class TestTODO1_VertexAIInitialization(unittest.TestCase):
         self.project_id = os.getenv("PROJECT_ID", "test-project")
         self.agent = LegalIntelligenceAgent(self.project_id)
 
-    @patch('src.core.agent_system.vertexai')
-    @patch('src.core.agent_system.GenerativeModel')
-    def test_vertex_ai_initialization(self, mock_model_class, mock_vertexai):
+    @patch('src.core.agent_system.genai')
+    def test_vertex_ai_initialization(self, mock_genai):
         """Test that Vertex AI is properly initialized."""
-        # Mock the model instance
-        mock_model = Mock()
-        mock_model.generate_content.return_value = Mock(text="OK")
-        mock_model_class.return_value = mock_model
+        # Mock the genai.Client and its structure
+        mock_client_instance = Mock()
+        
+        # Mock the models.generate_content method chain
+        mock_models = Mock()
+        mock_response = Mock()
+        mock_response.text = "OK"
+        mock_models.generate_content.return_value = mock_response
+        mock_client_instance.models = mock_models
+        
+        # Mock Client constructor to return our mock
+        mock_genai.Client.return_value = mock_client_instance
 
         # Call initialize
         result = self.agent.initialize_vertex_ai()
 
-        # Verify initialization was called
-        mock_vertexai.init.assert_called_once_with(
+        # Verify Client was created with correct parameters
+        mock_genai.Client.assert_called_once_with(
+            vertexai=True,
             project=self.project_id,
             location=self.agent.location
         )
 
-        # Verify model was created
-        mock_model_class.assert_called_once_with(self.agent.model_name)
-
-        # Verify test prompt was sent
-        mock_model.generate_content.assert_called()
+        # Verify test prompt was sent through models.generate_content
+        self.assertTrue(mock_models.generate_content.called, "generate_content should have been called")
+        
+        # Verify the call had correct parameters
+        call_args = mock_models.generate_content.call_args
+        self.assertIsNotNone(call_args, "generate_content should have been called with arguments")
+        # Check that model parameter was passed
+        self.assertEqual(call_args.kwargs.get('model'), self.agent.model_name)
+        # Check that contents parameter was passed (test prompt)
+        self.assertIn("OK", call_args.kwargs.get('contents', ""))
+        # Check that config parameter was passed
+        self.assertIsNotNone(call_args.kwargs.get('config'))
 
         # Verify success
         self.assertTrue(result, "Initialization should return True on success")

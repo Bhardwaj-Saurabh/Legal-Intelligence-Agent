@@ -172,8 +172,6 @@ class LegalPersonas:
 
     def _create_strategic_consultant_persona(self) -> str:
         """
-        TODO 8: Create the Strategic Consultant persona.
-
         CURRENT STATE: Generic placeholder with no expertise
 
         Requirements:

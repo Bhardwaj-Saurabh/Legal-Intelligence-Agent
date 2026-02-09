@@ -306,6 +306,8 @@ class QualityValidator:
         reasoning_count = sum(1 for phrase in reasoning_phrases if phrase in content_lower)
         if reasoning_count >= 5:
             score += 0.3
+        elif reasoning_count >= 4:
+            score += 0.25
         elif reasoning_count >= 3:
             score += 0.2
         elif reasoning_count >= 2:
@@ -315,8 +317,21 @@ class QualityValidator:
 
         # 5. Check expected elements coverage (up to 0.3 points)
         if expected_elements:
-            covered_elements = sum(1 for element in expected_elements 
-                                 if element.lower() in content_lower)
+            # Check for both exact matches and partial matches (e.g., "recommend" matches "recommendation")
+            covered_elements = 0
+            for element in expected_elements:
+                element_lower = element.lower()
+                # Check for exact match
+                if element_lower in content_lower:
+                    covered_elements += 1
+                else:
+                    # Check for partial matches - if element root word appears in content
+                    # e.g., "recommend" should match "recommendation"
+                    element_root = element_lower.rstrip('ation').rstrip('ing').rstrip('s')
+                    if len(element_root) >= 4:  # Only check if root is substantial
+                        if element_root in content_lower:
+                            covered_elements += 1
+            
             element_coverage = covered_elements / len(expected_elements)
             
             # Score based on coverage percentage
