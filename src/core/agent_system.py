@@ -77,8 +77,6 @@ class LegalIntelligenceAgent:
 
     def initialize_vertex_ai(self) -> bool:
         """
-        TODO 1: Initialize Vertex AI and create model instance.
-
         CURRENT STATE: Always returns False, can't connect to Vertex AI
 
         Requirements:
@@ -154,8 +152,6 @@ class LegalIntelligenceAgent:
         previous_sections: List[ReportSection] = None
     ) -> Tuple[str, TokenUsage, float]:
         """
-        TODO 2: Generate content for a specific report section.
-
         CURRENT STATE: Returns dummy content, no actual AI generation
 
         Requirements:
@@ -190,25 +186,74 @@ class LegalIntelligenceAgent:
         # Build the comprehensive prompt
         prompt = self._build_prompt(persona, section_type, scenario, previous_sections)
 
-        # TODO 2: Implement content generation with retry logic
-        # YOUR CODE HERE (approximately 25-35 lines)
-        # Steps:
-        # 1. Set max_retries = 3
-        # 2. Loop for retry attempts
-        # 3. Try to generate content using self.model.generate_content()
-        # 4. Extract text from response
-        # 5. Create TokenUsage from response.usage_metadata
-        # 6. Calculate cost using self._calculate_cost()
-        # 7. Handle exceptions with exponential backoff
-        # 8. Return (content, token_usage, cost)
+        # Implement content generation with retry logic
+        max_retries = 3
+        last_exception = None
 
-        # DUMMY IMPLEMENTATION - REPLACE THIS!
-        logger.warning("TODO 2 not implemented: Using dummy content")
-        dummy_content = f"[BROKEN] This is dummy content for {section_type}. The AI generation is not working."
-        dummy_tokens = TokenUsage(input_tokens=100, output_tokens=50, total_tokens=150)
-        dummy_cost = 0.01
+        for attempt in range(max_retries):
+            try:
+                # Generate content using the model
+                response = self.model.generate_content(
+                    contents=prompt,
+                    config=self.generation_config
+                )
 
-        return dummy_content, dummy_tokens, dummy_cost
+                # Extract text from response
+                if not response or not hasattr(response, 'text') or not response.text:
+                    raise ValueError("Empty or invalid response from model")
+
+                content = response.text
+
+                # Extract token usage from response.usage_metadata
+                if not hasattr(response, 'usage_metadata') or not response.usage_metadata:
+                    raise ValueError("Missing usage_metadata in response")
+
+                usage_metadata = response.usage_metadata
+                input_tokens = getattr(usage_metadata, 'prompt_token_count', 0)
+                output_tokens = getattr(usage_metadata, 'candidates_token_count', 0)
+                total_tokens = getattr(usage_metadata, 'total_token_count', input_tokens + output_tokens)
+
+                # Create TokenUsage object
+                token_usage = TokenUsage(
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    total_tokens=total_tokens
+                )
+
+                # Calculate cost
+                cost = self._calculate_cost(token_usage)
+
+                # Track token usage for statistics
+                self.token_usage_history.append(token_usage)
+                self.total_attempts += 1
+                self.success_count += 1
+
+                # Track processing time
+                processing_time = time.time() - start_time
+                self.processing_times.append(processing_time)
+
+                logger.info(f"Successfully generated content for {section_type} (attempt {attempt + 1})")
+                logger.debug(f"Tokens used: {total_tokens} (input: {input_tokens}, output: {output_tokens}), Cost: ${cost:.4f}")
+
+                return content, token_usage, cost
+
+            except Exception as e:
+                last_exception = e
+                self.total_attempts += 1
+                
+                if attempt < max_retries - 1:
+                    # Exponential backoff: wait 2^attempt seconds
+                    wait_time = 2 ** attempt
+                    logger.warning(
+                        f"Content generation failed for {section_type} (attempt {attempt + 1}/{max_retries}): {str(e)}. "
+                        f"Retrying in {wait_time} seconds..."
+                    )
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Content generation failed for {section_type} after {max_retries} attempts: {str(e)}")
+
+        # If we get here, all retries failed
+        raise RuntimeError(f"Failed to generate content for {section_type} after {max_retries} attempts: {str(last_exception)}")
 
     async def generate_complete_report(self, scenario: LegalScenario) -> AnalysisReport:
         """
