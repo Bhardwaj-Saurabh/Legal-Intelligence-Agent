@@ -52,6 +52,7 @@ class LegalIntelligenceAgent:
         self.location = location
         self.model_name = model_name
         self.client = None
+        self.model = None
         self.initialized = False
 
         # Components
@@ -98,18 +99,47 @@ class LegalIntelligenceAgent:
         try:
             logger.info(f"Initializing Vertex AI for project: {self.project_id}")
 
-            # TODO 1: Initialize Vertex AI
-            # YOUR CODE HERE (approximately 10-15 lines)
-            # Steps:
-            # 1. Initialize vertexai with project and location
-            # 2. Create the GenerativeModel instance
-            # 3. Test with a simple prompt
-            # 4. Check the response
-            # 5. Set self.initialized = True if successful
-            # 6. Return True for success, False for failure
+            # Initialize Google Gen AI client with Vertex AI support
+            self.client = genai.Client(
+                vertexai=True,
+                project=self.project_id,
+                location=self.location
+            )
+            logger.info(f"Vertex AI client created for project: {self.project_id}, location: {self.location}")
 
-            logger.error("TODO 1 not implemented: Vertex AI initialization failed")
-            return False
+            # Create a model wrapper that uses the client internally
+            # This provides the generate_content() interface expected by the rest of the code
+            class ModelWrapper:
+                def __init__(self, client, model_name):
+                    self.client = client
+                    self.model_name = model_name
+                
+                def generate_content(self, contents, config=None):
+                    return self.client.models.generate_content(
+                        model=self.model_name,
+                        contents=contents,
+                        config=config
+                    )
+            
+            self.model = ModelWrapper(self.client, self.model_name)
+            logger.info(f"Model wrapper created: {self.model_name}")
+
+            # Test the connection with a simple prompt
+            test_config = types.GenerateContentConfig(max_output_tokens=10)
+            test_response = self.model.generate_content(
+                contents="Say 'OK' if you're working",
+                config=test_config
+            )
+
+            # Check the response
+            if test_response and test_response.text:
+                logger.info(f"Vertex AI connection test successful: {test_response.text[:50]}")
+                self.initialized = True
+                return True
+            else:
+                logger.error("Vertex AI connection test failed: No response text")
+                self.initialized = False
+                return False
 
         except Exception as e:
             logger.error(f"Failed to initialize Vertex AI: {str(e)}")
