@@ -230,20 +230,110 @@ class QualityValidator:
         - Cap the final score at 1.0
         """
         score = 0.0
+        content_lower = content.lower()
 
-        # TODO 5: Implement groundedness scoring algorithm
-        # YOUR CODE HERE (approximately 35-45 lines)
-        # Steps:
         # 1. Define section-specific keywords dictionary
-        # 2. Get keywords for this section_type
-        # 3. Calculate keyword coverage
-        # 4. Check for reasoning indicators
-        # 5. Check expected elements coverage
-        # 6. Calculate final score (cap at 1.0)
+        section_keywords = {
+            "liability_assessment": [
+                'liability', 'negligence', 'breach', 'duty', 'causation', 'fault',
+                'responsibility', 'obligation', 'standard of care', 'proximate cause',
+                'tort', 'wrongful', 'violation', 'infringement', 'claim', 'defendant',
+                'plaintiff', 'merit', 'evidence', 'precedent', 'case law'
+            ],
+            "damage_calculation": [
+                'damages', 'compensation', 'calculation', 'quantum', 'loss', 'injury',
+                'harm', 'economic loss', 'lost profits', 'punitive', 'actual damages',
+                'statutory damages', 'restitution', 'recovery', 'award', 'settlement',
+                'monetary', 'financial impact', 'cost', 'expense', 'revenue'
+            ],
+            "prior_art_analysis": [
+                'prior art', 'patent', 'novelty', 'obviousness', 'invention', 'claims',
+                'validity', 'infringement', 'patentability', 'non-obvious', 'prior',
+                'existing', 'publication', 'disclosure', 'freedom to operate', 'f-to',
+                'patent search', 'art', 'reference', 'prior publication'
+            ],
+            "competitive_landscape": [
+                'competitors', 'market share', 'positioning', 'competitive', 'market',
+                'industry', 'rival', 'competition', 'advantage', 'disadvantage',
+                'market position', 'market leader', 'niche', 'differentiation',
+                'competitive advantage', 'market analysis', 'competitive analysis',
+                'market dynamics', 'market trends', 'market size'
+            ],
+            "risk_assessment": [
+                'risk', 'probability', 'impact', 'mitigation', 'threat', 'vulnerability',
+                'exposure', 'likelihood', 'consequence', 'severity', 'uncertainty',
+                'hazard', 'peril', 'danger', 'challenge', 'concern', 'issue',
+                'risk management', 'risk analysis', 'risk factor', 'risk level'
+            ],
+            "strategic_recommendations": [
+                'recommendation', 'strategy', 'implementation', 'action', 'plan',
+                'approach', 'tactic', 'initiative', 'measure', 'step', 'course of action',
+                'proposal', 'suggestion', 'guidance', 'direction', 'roadmap', 'timeline',
+                'milestone', 'objective', 'goal', 'priority'
+            ]
+        }
 
-        # BROKEN IMPLEMENTATION - FIX THIS!
-        logger.warning("TODO 5 not implemented: Groundedness scoring broken")
-        return 0.0  # Always returns 0 - FIX THIS!
+        # 2. Get keywords for this section_type
+        keywords = section_keywords.get(section_type, [])
+        
+        # 3. Calculate keyword coverage (up to 0.4 points)
+        if keywords:
+            found_keywords = sum(1 for keyword in keywords if keyword.lower() in content_lower)
+            keyword_coverage = found_keywords / len(keywords)
+            
+            # Score based on coverage percentage
+            if keyword_coverage >= 0.5:  # 50% or more keywords found
+                score += 0.4
+            elif keyword_coverage >= 0.3:  # 30-49% keywords found
+                score += 0.3
+            elif keyword_coverage >= 0.2:  # 20-29% keywords found
+                score += 0.2
+            elif keyword_coverage >= 0.1:  # 10-19% keywords found
+                score += 0.1
+            # Less than 10% gets 0 points
+
+        # 4. Check for reasoning indicators (up to 0.3 points)
+        reasoning_phrases = [
+            'based on', 'because', 'due to', 'as a result', 'according to',
+            'evidence shows', 'the evidence', 'research indicates', 'studies show',
+            'data suggests', 'analysis reveals', 'findings indicate', 'demonstrates',
+            'establishes', 'proves', 'supports', 'indicates', 'suggests', 'reveals',
+            'shows that', 'indicates that', 'suggests that', 'demonstrates that',
+            'according to the', 'in light of', 'given that', 'considering',
+            'taking into account', 'in view of', 'on the basis of'
+        ]
+        
+        reasoning_count = sum(1 for phrase in reasoning_phrases if phrase in content_lower)
+        if reasoning_count >= 5:
+            score += 0.3
+        elif reasoning_count >= 3:
+            score += 0.2
+        elif reasoning_count >= 2:
+            score += 0.15
+        elif reasoning_count >= 1:
+            score += 0.1
+
+        # 5. Check expected elements coverage (up to 0.3 points)
+        if expected_elements:
+            covered_elements = sum(1 for element in expected_elements 
+                                 if element.lower() in content_lower)
+            element_coverage = covered_elements / len(expected_elements)
+            
+            # Score based on coverage percentage
+            if element_coverage >= 1.0:  # All elements found
+                score += 0.3
+            elif element_coverage >= 0.75:  # 75-99% elements found
+                score += 0.25
+            elif element_coverage >= 0.5:  # 50-74% elements found
+                score += 0.2
+            elif element_coverage >= 0.25:  # 25-49% elements found
+                score += 0.15
+            elif element_coverage > 0:  # 1-24% elements found
+                score += 0.1
+            # 0% gets 0 points
+
+        # 6. Cap the final score at 1.0
+        return min(score, 1.0)
 
     def _calculate_completeness_score(self, content: str, expected_elements: List[str]) -> float:
         """Calculate how completely the content addresses requirements."""
