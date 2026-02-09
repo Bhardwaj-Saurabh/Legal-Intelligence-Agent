@@ -257,8 +257,6 @@ class LegalIntelligenceAgent:
 
     async def generate_complete_report(self, scenario: LegalScenario) -> AnalysisReport:
         """
-        TODO 3: Generate a complete analysis report.
-
         CURRENT STATE: Generates dummy report with no real analysis
 
         Requirements:
@@ -286,49 +284,138 @@ class LegalIntelligenceAgent:
         logger.info(f"Starting complete report generation for case: {scenario.case_name}")
         start_time = time.time()
 
-        # TODO 3: Implement complete report generation
-        # YOUR CODE HERE (approximately 40-60 lines)
-        # Steps:
-        # 1. Define section_config with (section_type, persona) pairs
-        # 2. Initialize sections list and total_cost
-        # 3. Loop through section_config
-        # 4. Get persona using self.personas.get_persona()
-        # 5. Generate content using: await asyncio.to_thread(self.generate_section_content, ...)
-        #    IMPORTANT: Use asyncio.to_thread() to prevent blocking the event loop!
-        # 6. Validate quality using self.quality_validator.validate_section()
-        # 7. Retry if quality < 0.7 (also use asyncio.to_thread for retry)
-        # 8. Create ReportSection objects
-        # 9. Assemble final AnalysisReport
-
-        # DUMMY IMPLEMENTATION - REPLACE THIS!
-        logger.warning("TODO 3 not implemented: Generating dummy report")
-
-        dummy_sections = [
-            ReportSection(
-                type="liability_assessment",
-                title="Liability Assessment",
-                content="[BROKEN] Dummy liability content",
-                agent_type="business_analyst",
-                quality_score=0.5,
-                tokens_used=100,
-                cost=0.01,
-                timestamp=datetime.now().isoformat()
-            )
+        # Define section generation sequence with persona assignments
+        section_config = [
+            ("liability_assessment", "business_analyst"),
+            ("damage_calculation", "business_analyst"),
+            ("prior_art_analysis", "market_researcher"),
+            ("competitive_landscape", "market_researcher"),
+            ("risk_assessment", "strategic_consultant"),
+            ("strategic_recommendations", "strategic_consultant")
         ]
 
-        dummy_report = AnalysisReport(
-            scenario=scenario,
-            sections=dummy_sections,
-            executive_summary="[BROKEN] System not working - TODOs not implemented",
-            total_cost=0.01,
-            total_tokens=100,
-            processing_time=1.0,
-            confidence_score=0.5,
-            timestamp=datetime.now().isoformat(),
-            metadata={"error": "TODOs not implemented"}
-        )
+        # Initialize sections list and tracking variables
+        sections = []
+        total_cost = 0.0
+        total_tokens = 0
+        quality_threshold = 0.7
+        max_quality_retries = 2
 
-        return dummy_report
+        # Generate each section with context chaining
+        for section_type, persona_type in section_config:
+            logger.info(f"Generating section: {section_type} using {persona_type} persona")
+            
+            # Get persona text
+            persona = self.personas.get_persona(persona_type)
+            
+            # Get expected elements for quality validation
+            expected_elements = self._get_expected_elements(section_type)
+            
+            # Generate content with quality validation and retry
+            content = None
+            token_usage = None
+            cost = 0.0
+            quality_score = 0.0
+            
+            for quality_attempt in range(max_quality_retries + 1):
+                try:
+                    # Generate content using asyncio.to_thread to prevent blocking
+                    content, token_usage, cost = await asyncio.to_thread(
+                        self.generate_section_content,
+                        persona=persona,
+                        section_type=section_type,
+                        scenario=scenario,
+                        previous_sections=sections
+                    )
+                    
+                    # Validate quality
+                    quality_result = self.quality_validator.validate_section(
+                        content=content,
+                        section_type=section_type,
+                        expected_elements=expected_elements
+                    )
+                    quality_score = quality_result.overall_score
+                    
+                    logger.info(f"Section {section_type} quality score: {quality_score:.2f}")
+                    
+                    # If quality meets threshold, break out of retry loop
+                    if quality_score >= quality_threshold:
+                        logger.info(f"Section {section_type} passed quality validation")
+                        break
+                    else:
+                        if quality_attempt < max_quality_retries:
+                            logger.warning(
+                                f"Section {section_type} quality below threshold ({quality_score:.2f} < {quality_threshold}). "
+                                f"Retrying... (attempt {quality_attempt + 1}/{max_quality_retries})"
+                            )
+                            # Add quality feedback to prompt for retry
+                            feedback_text = "; ".join(quality_result.feedback)
+                            persona = f"{persona}\n\nIMPORTANT: Previous attempt had quality issues. Please address: {feedback_text}"
+                        else:
+                            logger.warning(
+                                f"Section {section_type} quality still below threshold after {max_quality_retries} retries. "
+                                f"Proceeding with quality score: {quality_score:.2f}"
+                            )
+                
+                except Exception as e:
+                    logger.error(f"Error generating section {section_type}: {str(e)}")
+                    if quality_attempt < max_quality_retries:
+                        logger.info(f"Retrying section {section_type}...")
+                        continue
+                    else:
+                        raise RuntimeError(f"Failed to generate section {section_type} after retries: {str(e)}")
+            
+            # Create ReportSection object
+            section = ReportSection(
+                type=section_type,
+                title=self._get_section_title(section_type),
+                content=content,
+                agent_type=self._get_agent_type(persona),
+                quality_score=quality_score,
+                tokens_used=token_usage.total_tokens,
+                cost=cost,
+                timestamp=datetime.now().isoformat()
+            )
+            
+            sections.append(section)
+            total_cost += cost
+            total_tokens += token_usage.total_tokens
+            
+            logger.info(f"Completed section {section_type}: {token_usage.total_tokens} tokens, ${cost:.4f} cost")
+        
+        # Calculate overall confidence score (average of section quality scores)
+        confidence_score = sum(s.quality_score for s in sections) / len(sections) if sections else 0.0
+        
+        # Generate executive summary
+        executive_summary = self._generate_executive_summary(sections, scenario)
+        
+        # Calculate total processing time
+        processing_time = time.time() - start_time
+        
+        # Assemble final AnalysisReport
+        report = AnalysisReport(
+            scenario=scenario,
+            sections=sections,
+            executive_summary=executive_summary,
+            total_cost=total_cost,
+            total_tokens=total_tokens,
+            processing_time=processing_time,
+            confidence_score=confidence_score,
+            timestamp=datetime.now().isoformat(),
+            metadata={
+                "sections_generated": len(sections),
+                "average_quality": confidence_score,
+                "generation_time": processing_time
+            }
+        )
+        
+        logger.info(
+            f"Report generation complete: {len(sections)} sections, "
+            f"{total_tokens} tokens, ${total_cost:.4f} cost, "
+            f"confidence: {confidence_score:.2f}"
+        )
+        
+        return report
 
     def _build_prompt(
         self,
