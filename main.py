@@ -427,11 +427,23 @@ async def _background_quality_check(report: AnalysisReport, scenario: LegalScena
 if __name__ == "__main__":
     import uvicorn
 
+    # Get port from environment or use default
+    port = int(os.getenv("PORT", 8000))
+    host = os.getenv("HOST", "0.0.0.0")
+    
+    logger.info("=" * 60)
+    logger.info("🚀 Starting Legal Intelligence AI System Server")
+    logger.info("=" * 60)
+    logger.info(f"📡 Server will be available at: http://localhost:{port}")
+    logger.info(f"📚 API Documentation: http://localhost:{port}/docs")
+    logger.info(f"🔍 Health Check: http://localhost:{port}/health")
+    logger.info("=" * 60)
+    
     # Run the FastAPI application
     uvicorn.run(
         app,
-        host="0.0.0.0",
-        port=8000,
+        host=host,
+        port=port,
         reload=CONFIG["debug"],
-        log_level="info" if CONFIG["debug"] else "warning"
+        log_level="info" if CONFIG["debug"] else "info"  # Changed to info to show startup messages
     )
